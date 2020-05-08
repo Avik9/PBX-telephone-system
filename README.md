@@ -1,99 +1,17 @@
-# Homework 5 - CSE 320 - Spring 2020
-#### Professor Eugene Stark
+# Private Branch Exchange (PBX) telephone system
+#### Avi  k Kadakia and Professor Eugene Stark
 
 ### **Due Date: Friday 5/8/2020 @ 11:59pm**
 
 ## Introduction
 
-The goal of this assignment is to become familiar with low-level POSIX
-threads, multi-threading safety, concurrency guarantees, and networking.
 The overall objective is to implement a server that simulates the behavior
 of a Private Branch Exchange (PBX) telephone system.
-As you will probably find this somewhat difficult, to grease the way
-I have provided you with a design for the server, as well as binary object
-files for almost all the modules.  This means that you can build a
-functioning server without initially facing too much complexity.
-In each step of the assignment, you will replace one of my
-binary modules with one built from your own source code.  If you succeed
-in replacing all of my modules, you will have completed your own
-version of the server.
 
-For this assignment, there are three modules to work on:
+For this project, there are three modules:
   * Server initialization (`main.c`)
   * Server module (`server.c`)
   * PBX module (`pbx.c`)
-
-It is probably best if you work on the modules in the order listed.
-You should turn in whatever modules you have worked on.
-Though the exact details are not set at this time, I expect that your
-code will be compiled and tested in the following four configurations:
-  1. Your `main.c` with my `server.o` and `pbx.o`.
-  2. Your `main.c` and `server.c` with my `pbx.o`.
-  3. Your `main.c`, `server.c` and `pbx.c`.
-  4. Unit tests on your `pbx.c` in isolation.
-
-If your code fails to compile in one or more of these configurations,
-you will receive zero points for that configuration.
-If your code compiles in a particular configuration, then you will receive
-a point for your code having compiled and you will receive points for whatever
-test cases for that configuration your program passes.
-
-### Takeaways
-
-After completing this homework, you should:
-
-* Have a basic understanding of socket programming
-* Understand thread execution, mutexes, and semaphores
-* Have an understanding of POSIX threads
-* Have some insight into the design of concurrent data structures
-* Have enhanced your C programming abilities
-
-## Hints and Tips
-
-* We strongly recommend you check the return codes of all system
-  calls. This will help you catch errors.
-
-* **BEAT UP YOUR OWN CODE!** Throw lots of concurrent calls at your
-  data structure libraries to ensure safety.
-
-* Your code should **NEVER** crash. We will be deducting points for
-  each time your program crashes during grading. Make sure your code
-  handles invalid usage gracefully.
-
-* You should make use of the macros in `debug.h`. You would never
-  expect a library to print arbitrary statements as it could interfere
-  with the program using the library. **FOLLOW THIS CONVENTION!**
-  `make debug` is your friend.
-
-> :scream: **DO NOT** modify any of the header files provided to you in the base code.
-> These have to remain unmodified so that the modules can interoperate correctly.
-> We will replace these header files with the original versions during grading.
-> You are of course welcome to create your own header files that contain anything
-> you wish.
-
-## Helpful Resources
-
-### Textbook Readings
-
-You should make sure that you understand the material covered in
-chapters **11.4** and **12** of **Computer Systems: A Programmer's
-Perspective 3rd Edition** before starting this assignment.  These
-chapters cover networking and concurrency in great detail and will be
-an invaluable resource for this assignment.
-
-### pthread Man Pages
-
-The pthread man pages can be easily accessed through your terminal.
-However, [this opengroup.org site](http://pubs.opengroup.org/onlinepubs/7908799/xsh/pthread.h.html)
-provides a list of all the available functions.  The same list is also
-available for [semaphores](http://pubs.opengroup.org/onlinepubs/7908799/xsh/semaphore.h.html).
-
-## Getting Started
-
-Fetch and merge the base code for `hw5` as described in `hw0`. You can
-find it at this link: https://gitlab02.cs.stonybrook.edu/cse320/hw5.
-Remember to use the `--stategy-option=theirs` flag for the `git merge`
-command to avoid merge conflicts in the Gitlab CI file.
 
 ### The Base Code
 
@@ -107,6 +25,7 @@ Here is the structure of the base code:
     │   └── pbx
     ├── hw5.sublime-project
     ├── include
+    │   ├── csapp.h
     │   ├── debug.h
     │   ├── pbx.h
     │   └── server.h
@@ -114,46 +33,24 @@ Here is the structure of the base code:
     │   └── pbx.a
     ├── Makefile
     ├── src
+    │   ├── csapp.c
     │   ├── globals.c
     │   └── main.c
+    │   └── pbx.c
+    │   └── server.c
     ├── tests
     │   └── .git_keep
     └── util
         └── tester.c
+        └── tester
 ```
 
-The base code consists of header files that define module interfaces,
-a library `pbx.a` containing binary object code for my
-implementations of the modules, a source code file `globals.c` that
-contains definitions of some global variables, and a source code file `main.c`
-that contains a stub for function `main()`.  The `Makefile` is
-designed to compile any existing source code files and then link them
-against the provided library.  The result is that any modules for
-which you provide source code will be included in the final
-executable, but modules for which no source code is provided will be
-pulled in from the library.  The `pbx.a` library was compiled
-without `-DDEBUG`, so it does not produce any debugging printout.
-Also provided is a demonstration binary `demo/pbx`.  This executable
-is a complete implementation of the PBX server, which is intended to help
-you understand the specifications from a behavioral point of view.
-It also does not produce any debugging printout, however.
-The `util` directory contains the source code for an automated test client,
-`tester`.  This is described in more detail below.
-
 Most of the detailed specifications for the various modules and functions
-that you are to implement are provided in the comments in the header
+that are to implemented are provided in the comments in the header
 files in the `include` directory.  In the interests of brevity and avoiding
 redundancy, those specifications are not reproduced in this document.
 Nevertheless, the information they contain is very important, and constitutes
 the authoritative specification of what you are to implement.
-
-> :scream: The various functions and variables defined in the header files
-> constitute the **entirety** of the interfaces between the modules in this program.
-> Use these functions and variables as described and **do not** introduce any
-> additional functions or global variables as "back door" communication paths
-> between the modules.  If you do, the modules you implement will not interoperate
-> properly with my implementations, and it will also likely negatively impact
-> our ability to test your code.
 
 ## The PBX Server: Overview
 
@@ -327,63 +224,19 @@ The initial keywords in each message are case-sensitive.
     * **ERROR**
     * **CHAT** ...arbitrary text...
 
-### Demonstration Server
-
-To help you understand what the PBX server is supposed to do, I have provided
-a complete implementation for demonstration purposes.
-Run it by typing the following command:
-
-```
-$ demo/pbx -p 3333
-```
-
-You may replace `3333` by any port number 1024 or above (port numbers below 1024
-are generally reserved for use as "well-known" ports for particular services,
-and require "root" privilege to be used).
-The server should report that it has been initialized and is listening
-on the specified port.
-From another terminal window, use `telnet` to connect to the server as follows:
-
-```
-$ telnet localhost 3333
-Trying 127.0.0.1...
-Connected to localhost.
-Escape character is '^]'.
-ON HOOK 4
-```
-
-You can now issue commands to the server:
-
-```
-pickup
-DIAL TONE
-dial 5
-ERROR
-hangup
-ON HOOK 4
-```
-
-If you make a second connection to the server from yet another terminal window,
-you can make calls.
-
 ## Task I: Server Initialization
 
-When the base code is compiled and run, it will print out a message
-saying that the server will not function until `main()` is
-implemented.  This is your first task.  The `main()` function will
-need to do the following things:
+The `main()` function does the following things:
 
-- Obtain the port number to be used by the server from the command-line
+- Obtains the port number to be used by the server from the command-line
   arguments.  The port number is to be supplied by the required option
   `-p <port>`.
   
-- Install a `SIGHUP` handler so that clean termination of the server can
-  be achieved by sending it a `SIGHUP`.  Note that you need to use
-  `sigaction()` rather than `signal()`, as the behavior of the latter is
-  not well-defined in a multithreaded context.
+- Installs a `SIGHUP` handler so that clean termination of the server can
+  be achieved by sending it a `SIGHUP`.  
 
-- Set up the server socket and enter a loop to accept connections
-  on this socket.  For each connection, a thread should be started to
+- Sets up the server socket and enter a loop to accept connections
+  on this socket.  For each connection, a thread starts to
   run function `pbx_client_service()`.
 
 These things should be relatively straightforward to accomplish, given the
@@ -393,9 +246,9 @@ and you should be able to connect to the server using the test client.
 
 ## Task II: Server Module
 
-In this part of the assignment, you are to implement the server module,
+The server module,
 which provides the function `pbx_client_service()` that is invoked
-when a client connects to the server.  You should implement this function
+when a client connects to the server.  This function is implemented
 in the `src/server.c` file.
 
 The `pbx_client_service` function is invoked as the **thread function**
@@ -419,7 +272,7 @@ so the server module need not be directly concerned with that.
 
 The PBX module is the central module in the implementation of the server.
 It provides the functions listed below, for which more detailed specifications
-are given in the header file `pbx.h`.  You should implement these functions
+are given in the header file `pbx.h`.  The folloeing functions are implemented 
 in the `src/pbx.c` file.
 
   * `PBX *pbx_init()`:  Initialize a new PBX.
@@ -458,11 +311,11 @@ and it is then required to wait for all the client service threads to unregister
 the associated TUs before returning.  Consider using a semaphore, possibly in conjunction
 with additional bookkeeping variables, for this purpose.
 
-## Test Exerciser
+## Stress Test Exerciser
 
-I have provided code for a test exerciser that you can use to help debug and test
-your implementation.  The code for it is in `util/tester.c`.
-You can build it using `make util/tester` and then run it as `util/tester`.
+A test exerciser was provided that you can use to test
+the implementation.  The code for it is in `util/tester.c`.
+It can be build using `make util/tester` and then run it as `util/tester`.
 It accepts the following command-line arguments:
 
   * `-h <hostname>`
@@ -483,22 +336,4 @@ It accepts the following command-line arguments:
 
 The tester contains a table that determines the probabilities of the various actions to
 be taken in each possible state, as well as a table used to check whether a particular
-state transition is valid for the current state.  You can read the code to find out more
-and you may make changes if you like.
-
-## Submission Instructions
-
-Make sure your hw5 directory looks similarly to the way it did
-initially and that your homework compiles (be sure to try compiling
-both with and without "debug").
-Note that you should omit any source files for modules that you did not
-complete, and that you might have some source and header files in addition
-to those shown.  You are also, of course, encouraged to create Criterion
-tests for your code.
-
-It would definitely be a good idea to use `valgrind` to check your program
-for memory and file descriptor leaks.  Keeping track of allocated objects
-and making sure to free them is potentially one of the more challenging aspects
-of this assignment.
-
-To submit, run `git submit hw5`.
+state transition is valid for the current state.
