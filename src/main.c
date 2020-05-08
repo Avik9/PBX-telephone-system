@@ -22,13 +22,13 @@ int main(int argc, char *argv[])
     // Option '-p <port>' is required in order to specify the port number
     // on which the server should listen.
 
-    char *port = Malloc(sizeof(char));
+    char *port = NULL;
     if (argc == 3 && (strcmp(argv[1], "-p") == 0))
-        strcpy(port, argv[2]);
+        port = argv[2];
     else
     {
         fprintf(stderr, "Usage: bin/pbx -p <port>\n");
-        _exit(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
     }
 
     // TODO: Set up the server socket and enter a loop to accept connections
@@ -38,8 +38,14 @@ int main(int argc, char *argv[])
     // shutdown of the server.
 
     // Perform required initialization of the PBX module.
-    // debug("Initializing PBX...");
+    debug("Initializing PBX...");
     pbx = pbx_init();
+
+    if (pbx == NULL)
+    {
+        fprintf(stderr, "PBX is NULL");
+        exit(EXIT_FAILURE);
+    }
 
     Signal(SIGHUP, handle_sighup);
 
@@ -57,9 +63,6 @@ int main(int argc, char *argv[])
         Pthread_create(&tid, NULL, pbx_client_service, connfdp);
     }
 
-    fprintf(stderr, "There was an error with the infinite "
-                    "loop of accepting connections.\n");
-
     terminate(EXIT_FAILURE);
 }
 
@@ -71,5 +74,5 @@ void terminate(int status)
     debug("Shutting down PBX...");
     pbx_shutdown(pbx);
     debug("PBX server terminating");
-    _exit(status);
+    exit(status);
 }

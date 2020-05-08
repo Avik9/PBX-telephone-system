@@ -7,15 +7,14 @@ struct tu
 {
     TU_STATE current_state;
     int number;
-    int outgoing;
-    int incoming;
-    sem_t tu_sem;
+    int calling;
+    sem_t tu_mutex;
 };
 
 struct pbx
 {
     int num_registered_tu;
-    sem_t pbx_sem;
+    sem_t pbx_mutex;
     TU *registered_tu[PBX_MAX_EXTENSIONS];
 };
 
@@ -28,20 +27,20 @@ int printStatus(TU *tu, char *msg);
  */
 PBX *pbx_init()
 {
-    // debug("Entered pbx_init");
+    debug("Entered pbx_init");
 
     PBX *temp = (PBX *)Malloc(sizeof(PBX));
-    // debug("Size of pbs: %ld", sizeof(PBX));
+    debug("Size of pbs: %ld", sizeof(PBX));
 
     if (temp == NULL)
         return NULL;
 
-    Sem_init(&temp->pbx_sem, 0, 1);
-    P(&temp->pbx_sem);
+    Sem_init(&temp->pbx_mutex, 0, 1);
+    P(&temp->pbx_mutex);
 
     temp->num_registered_tu = 0;
-    // debug("Exiting pbx_init");
-    V(&temp->pbx_sem);
+    debug("Exiting pbx_init");
+    V(&temp->pbx_mutex);
     return temp;
 }
 
@@ -57,14 +56,12 @@ PBX *pbx_init()
  */
 void pbx_shutdown(PBX *pbx)
 {
-    // debug("Entered pbx_shutdown");
-    P(&pbx->pbx_sem);
+    debug("Entered pbx_shutdown");
 
     Free(pbx);
     pbx = NULL;
 
-    // debug("Exiting pbx_shutdown");
-    V(&pbx->pbx_sem);
+    debug("Exiting pbx_shutdown");
 }
 
 /*
@@ -83,10 +80,12 @@ void pbx_shutdown(PBX *pbx)
 TU *pbx_register(PBX *pbx, int fd)
 {
     debug("Entered pbx_register | fd: %d", fd);
+    P(&pbx->pbx_mutex);
 
-    if (fd >= PBX_MAX_EXTENSIONS)
+    if (pbx->num_registered_tu >= PBX_MAX_EXTENSIONS || pbx->registered_tu[fd] != NULL || fd < 4)
     {
-        fprintf(stderr, "ERROR: Reached PBX_MAX_EXTENSIONS. FD: %d", fd);
+        V(&pbx->pbx_mutex);
+        fprintf(stderr, "ERROR: Invalid arguments for pbx_register. FD: %d", fd);
         return NULL;
     }
 
@@ -94,25 +93,23 @@ TU *pbx_register(PBX *pbx, int fd)
     if (temp_tu == NULL)
         return NULL;
 
-    Sem_init(&temp_tu->tu_sem, 0, 1);
-    P(&temp_tu->tu_sem);
+    Sem_init(&temp_tu->tu_mutex, 0, 1);
+    P(&temp_tu->tu_mutex);
 
     temp_tu->number = fd;
-    temp_tu->incoming = -1;
-    temp_tu->outgoing = -1;
+    temp_tu->calling = -1;
     temp_tu->current_state = TU_ON_HOOK;
     printStatus(temp_tu, "");
 
-    P(&pbx->pbx_sem);
     pbx->registered_tu[temp_tu->number] = temp_tu;
     pbx->num_registered_tu++;
 
     // debug("File descriptor   %d", temp_tu->number);
     // debug("num_registered_tu %d", pbx->num_registered_tu);
 
-    V(&temp_tu->tu_sem);
-    V(&pbx->pbx_sem);
-    // debug("Exiting pbx_register");
+    debug("Exiting pbx_register | tu: %d", temp_tu->number);
+    V(&temp_tu->tu_mutex);
+    V(&pbx->pbx_mutex);
 
     return temp_tu;
 }
@@ -128,19 +125,28 @@ TU *pbx_register(PBX *pbx, int fd)
  */
 int pbx_unregister(PBX *pbx, TU *tu)
 {
-    // debug("Entered pbx_unregister");
+    debug("Entered pbx_unregister | tu: %d", tu->number);
 
-    P(&pbx->pbx_sem);
-    if (pbx->registered_tu[tu->number] == NULL || pbx->num_registered_tu < 1)
+    P(&pbx->pbx_mutex);
+
+    if (tu == NULL || pbx->registered_tu[tu->number] == NULL || pbx->num_registered_tu < 1)
+    {
+        V(&pbx->pbx_mutex);
         return -1;
+    }
 
+    P(&tu->tu_mutex);
+    
     // debug("File descriptor   %d", tu->number);
     pbx->registered_tu[tu->number] = NULL;
     pbx->num_registered_tu--;
+
+    V(&tu->tu_mutex);
+
     Free(tu);
     // debug("num_registered_tu %d", pbx->num_registered_tu);
-    // debug("Exiting pbx_unregister");
-    V(&pbx->pbx_sem);
+    V(&pbx->pbx_mutex);
+    debug("Exiting pbx_unregister");
 
     return 0;
 }
@@ -156,7 +162,12 @@ int pbx_unregister(PBX *pbx, TU *tu)
  */
 int tu_fileno(TU *tu)
 {
-    // debug("Returning from tu_fileno");
+    debug("Entering tu_fileno | tu: %d", tu->number);
+
+    if (tu == NULL || pbx->registered_tu[tu->number] == NULL)
+        return -1;
+
+    debug("Returning from tu_fileno | tu: %d", tu->number);
     return tu->number;
 }
 
@@ -172,7 +183,12 @@ int tu_fileno(TU *tu)
  */
 int tu_extension(TU *tu)
 {
-    // debug("Returning from tu_extension");
+    debug("Entering tu_extension | tu: %d", tu->number);
+
+    if (tu == NULL || pbx->registered_tu[tu->number] == NULL)
+        return -1;
+
+    debug("Returning from tu_extension | tu: %d", tu->number);
     return tu->number;
 }
 
@@ -197,38 +213,61 @@ int tu_extension(TU *tu)
  */
 int tu_pickup(TU *tu)
 {
-    // debug("Entering tu_pickup");
-    P(&pbx->pbx_sem);
-    // P(&tu->tu_sem);
+    debug("Entering tu_pickup | tu: %d", tu->number);
+    P(&pbx->pbx_mutex);
+    P(&tu->tu_mutex);
+
+    if (tu == NULL || pbx == NULL || pbx->registered_tu[tu->number] == NULL)
+    {
+        V(&tu->tu_mutex);
+        V(&pbx->pbx_mutex);
+        return -1;
+    }
 
     switch (tu->current_state)
     {
 
     case TU_ON_HOOK:
-        // debug("Entering TU_ON_HOOK");
+        debug("Entering TU_ON_HOOK | tu: %d", tu->number);
 
         tu->current_state = TU_DIAL_TONE;
         printStatus(tu, "");
         break;
 
     case TU_RINGING:
-        // debug("Entering TU_RINGING");
+        debug("Entering TU_RINGING | tu: %d", tu->number);
+
         tu->current_state = TU_CONNECTED;
         printStatus(tu, "");
-        pbx->registered_tu[tu->incoming]->current_state = TU_CONNECTED;
-        pbx->registered_tu[tu->incoming]->incoming = tu->number;
-        printStatus(pbx->registered_tu[tu->incoming], "");
+
+        if (tu->number < tu->calling)
+            P(&pbx->registered_tu[tu->calling]->tu_mutex);
+        else
+        {
+            V(&tu->tu_mutex);
+            P(&pbx->registered_tu[tu->calling]->tu_mutex);
+            P(&tu->tu_mutex);
+        }
+
+        pbx->registered_tu[tu->calling]->current_state = TU_CONNECTED;
+        pbx->registered_tu[tu->calling]->calling = tu->number;
+        printStatus(pbx->registered_tu[tu->calling], "");
+
+        V(&pbx->registered_tu[tu->calling]->tu_mutex);
+
         break;
 
     default:
-        // debug("Entering default");
+        debug("Entering default | tu: %d", tu->number);
+        debug("tu state: %s  | TU: %d", tu_state_names[tu->current_state], tu->number);
+
         printStatus(tu, "");
         break;
     }
 
-    // V(&tu->tu_sem);
-    V(&pbx->pbx_sem);
-    // debug("Returning from tu_pickup");
+    V(&tu->tu_mutex);
+    V(&pbx->pbx_mutex);
+    debug("Returning from tu_pickup | tu: %d", tu->number);
     return 0;
 }
 
@@ -261,97 +300,109 @@ int tu_pickup(TU *tu)
  */
 int tu_hangup(TU *tu)
 {
-    // debug("Entering tu_hangup");
-    P(&pbx->pbx_sem);
-    // P(&tu->tu_sem);
+    debug("Entering tu_hangup | tu: %d", tu->number);
+    P(&pbx->pbx_mutex);
+    P(&tu->tu_mutex);
+    int temp;
+    if (tu == NULL || pbx == NULL || pbx->registered_tu[tu->number] == NULL)
+    {
+        V(&tu->tu_mutex);
+        V(&pbx->pbx_mutex);
+        return -1;
+    }
 
     switch (tu->current_state)
     {
 
     case TU_CONNECTED:
-        // debug("TU_CONNECTED");
+        debug("TU_CONNECTED | tu: %d", tu->number);
         tu->current_state = TU_ON_HOOK;
+        debug("TU_ON_HOOK | tu: %d", tu->number);
         printStatus(tu, "");
 
-        if (tu->incoming != -1)
+        if (tu->number < tu->calling)
+            P(&pbx->registered_tu[tu->calling]->tu_mutex);
+        else
         {
-            // debug("TU_CONNECTED: tu->incoming != -1");
-            pbx->registered_tu[tu->incoming]->current_state = TU_DIAL_TONE;
-            // debug("II TU_CONNECTED: tu->incoming != -1");
-            pbx->registered_tu[tu->incoming]->outgoing = -1;
-            // debug("III TU_CONNECTED: tu->incoming != -1");
-            printStatus(pbx->registered_tu[tu->incoming], "");
-            // debug("IV TU_CONNECTED: tu->incoming != -1");
-            tu->incoming = -1;
-            // debug("V TU_CONNECTED: tu->incoming != -1");
+            V(&tu->tu_mutex);
+            P(&pbx->registered_tu[tu->calling]->tu_mutex);
+            P(&tu->tu_mutex);
         }
-        else if (tu->outgoing != -1)
-        {
-            // debug("I TU_CONNECTED: tu->outgoing != -1");
-            pbx->registered_tu[tu->outgoing]->current_state = TU_DIAL_TONE;
-            // debug("II TU_CONNECTED: tu->outgoing != -1");
-            pbx->registered_tu[tu->outgoing]->incoming = -1;
-            // debug("III TU_CONNECTED: tu->outgoing != -1");
-            printStatus(pbx->registered_tu[tu->incoming], "");
-            // debug("IV TU_CONNECTED: tu->outgoing != -1");
-            tu->outgoing = -1;
-            // debug("V TU_CONNECTED: tu->outgoing != -1");
-        }
+        
+        // debug("TU_CONNECTED: tu->incoming != -1");
+        pbx->registered_tu[tu->calling]->current_state = TU_DIAL_TONE;
+        pbx->registered_tu[tu->calling]->calling = -1;
+        printStatus(pbx->registered_tu[tu->calling], "");
+        temp = tu->calling;
+        tu->calling = -1;
+
+        V(&pbx->registered_tu[temp]->tu_mutex);
+
         break;
 
     case TU_RING_BACK:
-        // debug("TU_RING_BACK");
+        debug("TU_RING_BACK | tu: %d", tu->number);
         tu->current_state = TU_ON_HOOK;
         printStatus(tu, "");
 
-        if (tu->incoming != -1)
+        if (tu->number < tu->calling)
+            P(&pbx->registered_tu[tu->calling]->tu_mutex);
+        else
         {
-            // debug("I TU_RING_BACK: tu->incoming != -1");
-            pbx->registered_tu[tu->incoming]->current_state = TU_ON_HOOK;
-            // debug("II TU_RING_BACK: tu->incoming != -1");
-            printStatus(pbx->registered_tu[tu->incoming], "");
-            // debug("III TU_RING_BACK: tu->incoming != -1");
-            tu->incoming = -1;
-            // debug("IV TU_RING_BACK: tu->incoming != -1");
+            V(&tu->tu_mutex);
+            P(&pbx->registered_tu[tu->calling]->tu_mutex);
+            P(&tu->tu_mutex);
         }
-        else if (tu->outgoing != -1)
-        {
-            // debug("I TU_RING_BACK: tu->outgoing != -1");
-            pbx->registered_tu[tu->outgoing]->current_state = TU_ON_HOOK;
-            // debug("II TU_RING_BACK: tu->outgoing != -1");
-            printStatus(pbx->registered_tu[tu->outgoing], "");
-            // debug("III TU_RING_BACK: tu->outgoing != -1");
-            tu->outgoing = -1;
-            // debug("IV TU_RING_BACK: tu->outgoing != -1");
-        }
+        
+        // debug("I TU_RING_BACK: tu->incoming != -1");
+        pbx->registered_tu[tu->calling]->current_state = TU_ON_HOOK;
+        printStatus(pbx->registered_tu[tu->calling], "");
+        temp = tu->calling;
+        tu->calling = -1;
+
+        V(&pbx->registered_tu[temp]->tu_mutex);
+
         break;
 
     case TU_RINGING:
-        // debug("TU_RINGING");
+        debug("TU_RINGING | tu: %d", tu->number);
+
         tu->current_state = TU_ON_HOOK;
         printStatus(tu, "");
 
-        pbx->registered_tu[tu->incoming]->current_state = TU_DIAL_TONE;
-        printStatus(pbx->registered_tu[tu->incoming], "");
+        if (tu->number < tu->calling)
+            P(&pbx->registered_tu[tu->calling]->tu_mutex);
+        else
+        {
+            V(&tu->tu_mutex);
+            P(&pbx->registered_tu[tu->calling]->tu_mutex);
+            P(&tu->tu_mutex);
+        }
+
+        pbx->registered_tu[tu->calling]->current_state = TU_DIAL_TONE;
+        printStatus(pbx->registered_tu[tu->calling], "");
+
+        V(&pbx->registered_tu[tu->calling]->tu_mutex);
+
         break;
 
     case TU_DIAL_TONE:
     case TU_BUSY_SIGNAL:
     case TU_ERROR:
-        // debug("TU_ERROR");
+        debug("dial: tu state: %s | TU: %d", tu_state_names[tu->current_state], tu->number);
         tu->current_state = TU_ON_HOOK;
         printStatus(tu, "");
         break;
 
     default:
-        // debug("default");
+        debug("default | tu: %d", tu->number);
         printStatus(tu, "");
         break;
     }
 
-    // V(&tu->tu_sem);
-    V(&pbx->pbx_sem);
-    // debug("Returning from tu_hangup");
+    V(&tu->tu_mutex);
+    V(&pbx->pbx_mutex);
+    debug("Returning from tu_hangup | tu: %d", tu->number);
     return 0;
 }
 
@@ -383,48 +434,71 @@ int tu_hangup(TU *tu)
  */
 int tu_dial(TU *tu, int ext)
 {
-    P(&pbx->pbx_sem);
-    // P(&tu->tu_sem);
+    debug("Entered tu_dial | tu: %d | status: %s", tu->number, tu_state_names[tu->current_state]);
 
-    if (tu == NULL || ext < 4)
-    {
-        V(&pbx->pbx_sem);
-        // V(&tu->tu_sem);
+    if (tu == NULL || ext < -1)
         return -1;
-    }
+
+    P(&pbx->pbx_mutex);
+    P(&tu->tu_mutex);
+
     if (pbx->registered_tu[ext] == NULL && tu->current_state == TU_DIAL_TONE)
     {
+        debug("tu->current_state = TU_ERROR | tu: %d", tu->number);
         tu->current_state = TU_ERROR;
         printStatus(tu, "");
     }
     else if (tu->current_state == TU_DIAL_TONE)
     {
-        if(tu->number == ext)
+        debug("tu->current_state == TU_DIAL_TONE");
+
+        if (tu->number == ext)
         {
+        }
+        else if (tu->number < ext)
+            P(&pbx->registered_tu[ext]->tu_mutex);
+        else
+        {
+            V(&tu->tu_mutex);
+            P(&pbx->registered_tu[ext]->tu_mutex);
+            P(&tu->tu_mutex);
+        }
+
+        debug("Exited editing the semaphores");
+
+        if (tu->number == ext)
+        {
+            debug("tu->number == ext | tu: %d", tu->number);
             tu->current_state = TU_BUSY_SIGNAL;
             printStatus(tu, "");
         }
-        else if (pbx->registered_tu[ext]->current_state == TU_ON_HOOK)
+        if (pbx->registered_tu[ext]->current_state == TU_ON_HOOK)
         {
+            debug("pbx->registered_tu[ext]->current_state == TU_ON_HOOK | tu: %d", ext);
             tu->current_state = TU_RING_BACK;
-            tu->outgoing = ext;
+            tu->calling = ext;
             printStatus(tu, "");
             pbx->registered_tu[ext]->current_state = TU_RINGING;
-            pbx->registered_tu[ext]->incoming = tu->number;
+            pbx->registered_tu[ext]->calling = tu->number;
             printStatus(pbx->registered_tu[ext], "");
         }
         else
         {
+            debug("In else condition | tu: %d", tu->number);
             tu->current_state = TU_BUSY_SIGNAL;
             printStatus(tu, "");
         }
+
+        if (tu->number != ext)
+            V(&pbx->registered_tu[ext]->tu_mutex);
     }
     else
         printStatus(tu, "");
 
-    // V(&tu->tu_sem);
-    V(&pbx->pbx_sem);
+    V(&tu->tu_mutex);
+    V(&pbx->pbx_mutex);
 
+    debug("Exiting tu_dial | tu: %d", tu->number);
     return 0;
 }
 
@@ -443,38 +517,50 @@ int tu_dial(TU *tu, int ext)
  */
 int tu_chat(TU *tu, char *msg)
 {
-    // debug("Entering tu_chat");
+    debug("Entering tu_chat | tu: %d", tu->number);
 
-    P(&pbx->pbx_sem);
-    // P(&tu->tu_sem);
+    P(&pbx->pbx_mutex);
+    P(&tu->tu_mutex);
+
+    if (tu == NULL || pbx == NULL || pbx->registered_tu[tu->number] == NULL)
+    {
+        debug("Returning from tu_chat with error");
+        V(&tu->tu_mutex);
+        V(&pbx->pbx_mutex);
+        return -1;
+    }
 
     if (tu->current_state != TU_CONNECTED)
     {
-        // debug("Returning from tu_chat with error");
+        debug("Returning from tu_chat because status != TU_CONNECTED | tu: %d", tu->number);
         printStatus(tu, "");
-        // V(&tu->tu_sem);
-        V(&pbx->pbx_sem);
+        V(&tu->tu_mutex);
+        V(&pbx->pbx_mutex);
         return -1;
     }
     else
     {
-        if (tu->incoming != -1)
+        debug("In the else statement | tu: %d", tu->number);
+
+        if (tu->number < tu->calling)
+            P(&pbx->registered_tu[tu->calling]->tu_mutex);
+        else
         {
-            printStatus(pbx->registered_tu[tu->incoming], msg);
-            printStatus(tu, "CHAT");
+            V(&tu->tu_mutex);
+            P(&pbx->registered_tu[tu->calling]->tu_mutex);
+            P(&tu->tu_mutex);
         }
 
-        else if (tu->outgoing != -1)
-        {
-            printStatus(pbx->registered_tu[tu->outgoing], msg);
-            printStatus(tu, "CHAT");
-        }
+        printStatus(pbx->registered_tu[tu->calling], msg);
+
+        V(&pbx->registered_tu[tu->calling]->tu_mutex);
+
+        printStatus(tu, "CHAT");
     }
 
-    // debug("Returning from tu_chat");
-
-    // V(&tu->tu_sem);
-    V(&pbx->pbx_sem);
+    V(&tu->tu_mutex);
+    V(&pbx->pbx_mutex);
+    debug("Returning from tu_chat | tu: %d", tu->number);
 
     return 0;
 }
@@ -489,24 +575,25 @@ int tu_chat(TU *tu, char *msg)
  */
 int printStatus(TU *tu, char *msg)
 {
+    debug("TU: %d | tu state: %s | msg: %s", tu->number, tu_state_names[tu->current_state], msg);
+
     int status = 0;
     if (strcmp(msg, "") == 0)
     {
-        // debug("In ''");
+        debug("In Regular print");
 
         switch (tu->current_state)
         {
-
         case TU_ON_HOOK:
+            debug("TU_ON_HOOK | TU: %d", tu->number);
             status = dprintf(tu->number, "%s %d%s", tu_state_names[tu->current_state], tu->number, EOL);
             break;
 
         case TU_CONNECTED:
-            if (tu->incoming != -1)
-                status = dprintf(tu->number, "%s %d%s", tu_state_names[tu->current_state], tu->incoming, EOL);
+            debug("TU_CONNECTED | TU: %d", tu->number);
 
-            else if (tu->outgoing != -1)
-                status = dprintf(tu->number, "%s %d%s", tu_state_names[tu->current_state], tu->outgoing, EOL);
+            if (tu->calling != -1)
+                status = dprintf(tu->number, "%s %d%s", tu_state_names[tu->current_state], tu->calling, EOL);
 
             break;
 
@@ -515,18 +602,18 @@ int printStatus(TU *tu, char *msg)
         case TU_RING_BACK:
         case TU_BUSY_SIGNAL:
         case TU_ERROR:
+            debug("tu state: %s  | TU: %d", tu_state_names[tu->current_state], tu->number);
+
             status = dprintf(tu->number, "%s%s", tu_state_names[tu->current_state], EOL);
             break;
         }
     }
     else if (strcmp(msg, "CHAT") == 0)
     {
-        // debug("In print CHAT");
-        if (tu->incoming != -1)
-            status = dprintf(tu->number, "%s %d%s", tu_state_names[tu->current_state], pbx->registered_tu[tu->incoming]->number, EOL);
-
-        else if (tu->outgoing != -1)
-            status = dprintf(tu->number, "%s %d%s", tu_state_names[tu->current_state], pbx->registered_tu[tu->outgoing]->number, EOL);
+        debug("In print CHAT");
+        debug("tu state: %s  | TU: %d", tu_state_names[tu->current_state], tu->number);
+        if (tu->calling != -1)
+            status = dprintf(tu->number, "%s %d%s", tu_state_names[tu->current_state], pbx->registered_tu[tu->calling]->number, EOL);
     }
 
     else
