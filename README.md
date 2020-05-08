@@ -1,7 +1,5 @@
 # Private Branch Exchange (PBX) telephone system
-#### Avi  k Kadakia and Professor Eugene Stark
-
-### **Due Date: Friday 5/8/2020 @ 11:59pm**
+#### Avik Kadakia and Professor Eugene Stark
 
 ## Introduction
 
@@ -50,7 +48,7 @@ that are to implemented are provided in the comments in the header
 files in the `include` directory.  In the interests of brevity and avoiding
 redundancy, those specifications are not reproduced in this document.
 Nevertheless, the information they contain is very important, and constitutes
-the authoritative specification of what you are to implement.
+the authoritative specification of what needs to be implemented.
 
 ## The PBX Server: Overview
 
@@ -239,10 +237,6 @@ The `main()` function does the following things:
   on this socket.  For each connection, a thread starts to
   run function `pbx_client_service()`.
 
-These things should be relatively straightforward to accomplish, given the
-information presented in class and in the textbook.  If you do them properly,
-the server should function and accept connections on the specified port,
-and you should be able to connect to the server using the test client.
 
 ## Task II: Server Module
 
@@ -313,7 +307,7 @@ with additional bookkeeping variables, for this purpose.
 
 ## Stress Test Exerciser
 
-A test exerciser was provided that you can use to test
+A test exerciser was provided that can be used to test
 the implementation.  The code for it is in `util/tester.c`.
 It can be build using `make util/tester` and then run it as `util/tester`.
 It accepts the following command-line arguments:
