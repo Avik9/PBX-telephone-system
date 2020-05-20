@@ -1,0 +1,16 @@
+Graded Commit:5a7ec8deacd10efc72d6042971d6271cc6204fee
+
+TEST NAME, POINTS,OUT OF
+main_suite/connect_disconnect2_test,1,1,
+main_suite/connect_disconnect2_valgrind_test,1,1,
+main_suite/connect_disconnect_many_test,1,1,
+main_suite/connect_disconnect_many_valgrind_test,1,1,
+main_suite/connect_disconnect_test,1,1,
+main_suite/connect_disconnect_valgrind_test,1,1,
+main_suite/open_connection_test,1,1,
+main_suite/open_connection_valgrind_test,1,1,
+server_suite/dial_bad_test,1,1,
+server_suite/dial_self_test,1,1,
+server_suite/pickup_hangup2_test,1,1,
+server_suite/pickup_hangup_test,1,1,
+total,12,12

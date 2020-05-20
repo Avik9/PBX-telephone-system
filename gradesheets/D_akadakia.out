@@ -1,0 +1,44 @@
+[----] Criterion v2.3.2
+[====] Running 1 test from stress_suite:
+[RUN ] stress_suite::stress_test
+***Starting server...pid = 25683
+Waiting for server to start (i = 0)
+Waiting for server to start (i = 1)
+tcp        0      0 0.0.0.0:10000           0.0.0.0:*               LISTEN     
+Running test stress_suite/stress_test
+Forked tester 0 (pid 25693)
+Forked tester 1 (pid 25694)
+Forked tester 2 (pid 25695)
+Forked tester 3 (pid 25696)
+Forked tester 4 (pid 25697)
+Forked tester 5 (pid 25698)
+Forked tester 6 (pid 25699)
+Forked tester 7 (pid 25700)
+Forked tester 8 (pid 25701)
+Forked tester 9 (pid 25702)
+1589820117.605396: [25697] Connected to server localhost:61588
+1589820117.601852: [25694] Connected to server localhost:56468
+1589820117.603842: [25698] Connected to server localhost:59540
+1589820117.605237: [25701] Connected to server localhost:61076
+1589820117.602338: [25695] Connected to server localhost:58516
+1589820117.601538: [25699] Connected to server localhost:56980
+1589820117.605511: [25702] Connected to server localhost:60564
+1589820117.605447: [25700] Connected to server localhost:60052
+1589820117.602729: [25696] Connected to server localhost:59028
+1589820117.602241: [25693] Connected to server localhost:58004
+Tester pid 25693 terminated with status 0x0
+Tester pid 25694 terminated with status 0x0
+Tester pid 25695 terminated with status 0x0
+Tester pid 25696 terminated with status 0x0
+Tester pid 25697 terminated with status 0x0
+Tester pid 25698 terminated with status 0x0
+Tester pid 25699 terminated with status 0x0
+Tester pid 25700 terminated with status 0x0
+Tester pid 25701 terminated with status 0x0
+Tester pid 25702 terminated with status 0x0
+All testers terminated
+***Sending SIGHUP to server pid 25683
+***Server wait() returned = 0x0
+[PASS] stress_suite::stress_test: (22.23s)
+[----] Writing xml report in `crit.xml`.
+[====] Synthesis: Tested: 1 | Passing: 1 | Failing: 0 | Crashing: 0 

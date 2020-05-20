@@ -1,0 +1,21 @@
+Graded Commit:5a7ec8deacd10efc72d6042971d6271cc6204fee
+
+TEST NAME, POINTS,OUT OF
+main_suite/connect_disconnect2_test,1,1,
+main_suite/connect_disconnect2_valgrind_test,1,1,
+main_suite/connect_disconnect_many_test,1,1,
+main_suite/connect_disconnect_many_valgrind_test,1,1,
+main_suite/connect_disconnect_test,1,1,
+main_suite/connect_disconnect_valgrind_test,0,1,1 assertion(s) failed.: tests/grading_tests.c:148: Valgrind reported errors
+main_suite/open_connection_test,1,1,
+main_suite/open_connection_valgrind_test,0,1,1 assertion(s) failed.: tests/grading_tests.c:148: Valgrind reported errors
+pbx_suite/dial_answer_test,1,1,
+pbx_suite/dial_disconnect_test,1,1,
+pbx_suite/dial_good_test,1,1,
+pbx_suite/exercise_test,1,1,
+pbx_suite/exercise_valgrind_test,1,1,
+server_suite/dial_bad_test,1,1,
+server_suite/dial_self_test,0,1,"1 assertion(s) failed.: tests/grading_tests.c:432: expected 0, was -1"
+server_suite/pickup_hangup2_test,1,1,
+server_suite/pickup_hangup_test,1,1,
+total,14,17
