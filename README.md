@@ -1,5 +1,5 @@
 # Private Branch Exchange (PBX) telephone system
-#### Avik Kadakia and Professor Eugene Stark
+#### Avik Kadakia and Eugene Stark
 
 ## Introduction
 
